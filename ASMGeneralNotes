@@ -1,0 +1,224 @@
+ASM GENERAL NOTES
+
+Quick List of Registers:
+
+AX	accumulator
+BX	base
+CX	counter
+DX	data
+
+BP	base pointer (bottom of stack, highest stack address)
+SI	source index
+DI	destination index
+SP	stack pointer (top of stack; lowest stack address)
+
+IP	instruction pointer
+
+CS	segment register - code
+SS	segment register - stack
+DS	segment register - data
+ES	segment register - code or data
+FS	segment register - code or data
+GS	segment register - code or data
+
+1. Stack grows DOWN (to the TOP of the stack!!)(down as in address,
+from high address numbers to low address numbers). This is confusing,
+since some diagrams (they are always vertical) show the "top" or at the
+top of the page with the low address and some with the high.  also
+confuses the "width" of the stack, which in that configuration actually
+means up and down, not side-to side size.
+
+When given, on the command line, a program name (progname) and three
+arguments to it (foo, bar, baz), the stack will look like this, i.e.,
+the OS will put these things on the stack automatically:
+
+----------- 0x0  TOP of the stack, lowest address	|		   / \
+|													|			|
+| 4			argc								   \ /			|
+|												   push		   pop
+----------												  |
+|														  |
+|progname	argv[0]										  |
+|														  |
+-----------												  |
+|														  |
+|foo		argv[1]										  |
+|														  |
+-----------											      |
+|														 \ /
+|bar		argv[2]
+|
+----------
+|
+|baz		argv[3]
+|
+---------- 0xFFFFFFFF  BOTTOM of stack, highest address
+
+2. Kernel interrupt on 32-bit is int 80h.  swan.
+
+3. The 32-bit code runs in the flat memory model, which means you don't
+have to worry about segments.  swan.
+
+4. From NASM Handbook, to declare initialized data in the output file.
+They can be invoked in a wide range of ways:
+      db    0x55                ; just the byte 0x55
+      db    0x55,0x56,0x57      ; three bytes in succession
+      db    'a',0x55            ; character constants are OK
+      db    'hello',13,10,'$'   ; so are string constants
+      dw    0x1234              ; 0x34 0x12
+      dw    'a'                 ; 0x61 0x00 (it’s just a number)
+      dw    'ab'                ; 0x61 0x62 (character constant)
+      dw    'abc'               ; 0x61 0x62 0x63 0x00 (string)
+      dd    0x12345678          ; 0x78 0x56 0x34 0x12
+      dd    1.234567e20         ; floating−point constant
+      dq    0x123456789abcdef0  ; eight byte constant
+      dq    1.234567e20         ; double−precision float
+      dt    1.234567e20         ; extended−precision float
+
+RESB, RESW, RESD, RESQ, REST, RESO, RESY, and, RESZ:
+are designed to be used in the BSS section of a module: they declare
+uninitialized  storage space. Each takes a single operand, which is the
+number of bytes, words, doublewords or whatever to reserve.
+For example:
+buffer:         resb    64              ; reserve 64 bytes
+wordvar:        resw    1               ; reserve a word
+var2:			resd	1				; reserve for one double-word
+realarray       resq    10              ; array of ten reals (double-
+										; precision float (quad word)
+var3:			rest	1				; reserve space for 1 extended
+										; precision float
+ymmval:         resy    1               ; one YMM register
+zmmvals:        resz    32              ; 32 ZMM registers
+
+
+INCBIN
+: Including External Binary Files
+INCBIN
+is borrowed from the old Amiga assembler DevPac: it includes a binary
+ ile verbatim into the output
+file. This can be handy for (for example) including graphics and sound
+data directly into a game executable file. It can be called in one of
+these three ways:
+    incbin  "file.dat"             ; include the whole file
+    incbin  "file.dat",1024        ; skip the first 1024 bytes
+    incbin  "file.dat",1024,512    ; skip the first 1024, and
+                                   ; actually include at most 512
+
+EQU
+: Defining Constants
+EQU
+defines a symbol to a given constant value: when EQU is used, the
+source line must contain a label. The action of EQU is to define the given
+label name to the value of its (only) operand. This definition is absolute,
+and cannot change later. So, for example,
+
+message         db      'hello, world'
+msglen          equ     $ - message
+
+defines msglen to be the constant 12. msglen may not then be redefined
+later. This is not a preprocessor definition either: the value of
+msglen is evaluated once using the value of  $
+
+TIMES
+: Repeating Instructions or Data
+see manual to use.
+
+
+Effective Addresses
+An effective address is any operand to an instruction which references
+memory. Effective addresses, in NASM, have a very simple syntax: they
+consist of an expression evaluating to the desired address, enclosed in
+square brackets. For example:
+
+wordvar dw      123
+        mov     ax,[wordvar]
+        mov     ax,[wordvar+1]
+        mov     ax,[es:wordvar+bx]
+
+Anything not conforming to this simple system is not a valid memory
+reference in NASM, for example
+
+es:wordvar[bx]
+
+More complicated effective addresses, such as those involving more than
+one register, work in exactly the same way:
+
+        mov     eax,[ebx*2+ecx+offset]
+        mov     ax,[bp+di+8]
+
+5. System calls:
+
+	a.	put syscall opcode in eax;
+	b.	put the arguments in ebx, ecx, edx, etc., per whatever the
+	partiular syscall requires (see prototype);
+	c.	call the relevant interrupt (80h);
+	d.	the result will be returned to eax. swan.
+
+6. To compile, link, and run 32-bit code on 64-bit machine:
+
+	a.	nasm -f elf progname.asm
+	b.	ld -m elf_i386 -o progname progname.o
+	c.	./progname
+
+7. EAX gets the opcode of the syscall we want to execute, and the other
+registers get the arguments to the syscall.  asmtutor lesson 1.
+
+8. Indirect addressing allows registers to act like pointer variables.
+To indicate that a register is to be used indirectly as a pointer, the
+register is enclosed in brackets.  For example:
+
+	mov	ax, [Data]	; normal direct memory addressing of a word
+	mov	ebx, Data	; ebx = &Data (address-of)
+	mov	ax, [ebx]	; ax = *ebx
+
+9. INC/DEC - Dev manual says inc/dec an unsigned integer by one.  pcasm
+book says: The INC and DEC instructions increment or decrement values
+by one. Since the one is an implicit operand, the machine code for INC
+and DEC is smaller than for the equivalent ADD and SUB instructions.
+Ex:
+
+inc    ecx      ; ecx++
+dec    dl       ; dl
+
+See also exercise 3 in asmtutor where ADDRESS is inc'd by one BYTE.
+since we are counting letters that take up one byte...What if two-byte
+UTF, etc?
+
+10. A general purpose register on a 32-bit system holds an address max
+of 32-bits.  32 bits = 4 bytes = 8 nibbles.  Each hex digit requires
+one nibble, so 32-bit register can hold 8 hex digits, like so:
+
+11111111 11111111 11111111 11111111 11111111 11111111 11111111 11111111
+
+or
+
+0xFFFFFFFF
+
+or
+
+2^32 = 4,294,967,296 addressable bytes and */4 unique addresses.
+
+Take address 0x1, for example:
+
+------------------------------------------------------------------------
+|
+|
+|Address 0x1 =
+00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000001
+|
+-----------------------------------------------------------------------
+
+So, this address is 32-bits (4 bytes) WIDE, i.e., the address requires
+4 bytes, or 32 bits, so the next address needs to be this address plus
+4 bytes.
+
+11. Command-line arguments are loaded onto the stack automatically and
+will therefore be there in reverse-order, with the argc at the top,
+then argv[0], argv[1], etc., i.e., progname one two three, the stack
+will look like:
+
+4			top of stack pushing down |
+three								  \/
+two
+one
+progname
