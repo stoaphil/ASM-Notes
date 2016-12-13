@@ -1,0 +1,137 @@
+Assembly Addressing Modes (AT&T Syntax)
+
+Three different categories:  immediate, register, and main memory.
+
+
+--------------------------------------------------------------------------------
+
+
+IMMEDIATE ADDRESSING MODE:
+
+	Used to load constant values directly into registers or main memory.
+
+	EX:	movl	$12, %eax
+
+	copies the value 12 into the eax register
+
+	The'$' is necessary to advise the assembler this is an absolute value, not
+	an address.
+
+
+--------------------------------------------------------------------------------
+
+
+REGISTER ADDRESSING MODE:
+
+	Moves data from a register to a register (can be the same one.)
+
+	EX:	movl	%eax,	%ebx
+
+	copies whatever is in eax to ebx
+
+
+--------------------------------------------------------------------------------
+
+
+MAIN MEMORY ADDRESSING MODE:
+
+4 different modes: direct, indexed, indirect, and base pointer.  The general
+form for all of these is:
+
+		ADDRESS OR OFFSET(%BASE OR OFFSET,%INDEX,MULTIPLIER)
+
+		-	all fields optional;
+		-	address/offset and multiplier are constants; base/offset and index
+			are register names;
+		-	MULTIPLIER is 1, 2, or 4 for the "indexing" register to index by
+			bytes, double-bytes, or words.
+
+		the calculation is:
+
+		FINAL ADDRESS = ADDRESS/OFFSET + %BASE/OFFSET + (MULTIPLIER * %INDEX)
+
+
+	-------------
+
+
+	Direct:
+
+	(use only the ADDRESS portion of general form)
+
+	EX:	movl	ADDRESS, %eax
+
+	copies the VALUE held at ADDRESS to %eax
+
+
+	------------
+
+
+	Indexed:
+
+	(use ADDRESS/OFFSET and %INDEX portion of general form)
+
+	EX:	movl	string_start(,%ecx,1), %eax
+
+	string_start is a label, which is equiv. to a beginning address, so value
+	copied to %eax determined by adding the index (multiplied by the
+	multiplier, if existing) to the address and moving to %eax.
+
+	EXPANDED:
+
+		The instruction above contains a memory address (indicated by the start
+		of string_start), say 2002.  The instruction also contains an index
+		register that contains, as contents, an absolute number, say 4.  If
+		there was no multiplier, the address placed in %eax will be 2006, and
+		the data at address 2006 will be accessable through %eax.
+
+		Now, if there was a multiplier, the index will be multipled by that.
+		Multipliers, as noted above, can be 1, 2, or 4 (representing bytes.)
+
+		If accessing a word at a time, multiplier would be 4.
+
+		EX:
+
+		From maximum.s, p. 22:
+
+		.data_items:
+			.long 3, 67, 34,...  (.long is a word, 4 bytes)
+
+			movl	$0, %edi	#moves number zero into index edi
+
+			#Now, we want to move the first byte of data (3) into %eax, so
+			we start at address of first element of data (data_items), then add
+			to that (value in %edi, 0 * 4) = 0, so we are adding zero, so
+			accessing first element which by definition is at the first spot.
+			This will then, when looping through rest of code, will produce
+			successive elements, i.e., the third element, at spot 2 (0, 1, 2),
+			2 * 4 = 8, or two words past the first word, e.g., the third word
+			holding the third element of the list.
+
+			movl	data_items(,%edi,4), %eax
+
+
+	------------
+
+
+	Indirect:
+
+	EX:	movl	(%eax), %ebx
+
+	copies the VALUE from the ADDRESS indicated by %eax to %ebx
+
+	So, if the register %eax held the address 0xff, the VALUE held in main
+	memory address 0xff is copied to the register %ebx.
+
+
+	------------
+
+	Base Pointer:
+
+	Similar to Indirect, but adds a constant value to the ADDRESS in the source
+	register:
+
+	EX:	movl	4(%eax), %ebx
+
+	I.e., if there is a structure containing personal information of employees,
+	and the "Age" category is 4 BYTES into the record, the above instruction
+	will get you there.
